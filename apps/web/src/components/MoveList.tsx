@@ -21,9 +21,23 @@ export function MoveList({
   maxHeight?: string;
 }) {
   const activeRef = useRef<HTMLButtonElement | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  // Keep the current move visible by scrolling ONLY this list's own box.
+  // (scrollIntoView would also scroll the page, which on phones yanks the
+  // board off-screen after every move, because the list sits below it.)
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [current]);
+    const box = boxRef.current;
+    const active = activeRef.current;
+    if (!box) return;
+    if (!active) {
+      if (current === 0) box.scrollTop = 0;
+      return;
+    }
+    const boxRect = box.getBoundingClientRect();
+    const rowRect = active.getBoundingClientRect();
+    if (rowRect.top < boxRect.top) box.scrollTop -= boxRect.top - rowRect.top + 4;
+    else if (rowRect.bottom > boxRect.bottom) box.scrollTop += rowRect.bottom - boxRect.bottom + 4;
+  }, [current, moves.length]);
 
   const rows: { n: number; w?: number; b?: number }[] = [];
   for (let i = 0; i < moves.length; i += 2) rows.push({ n: i / 2 + 1, w: i, b: i + 1 < moves.length ? i + 1 : undefined });
@@ -49,7 +63,7 @@ export function MoveList({
   };
 
   return (
-    <div className={`${maxHeight} overflow-y-auto`}>
+    <div ref={boxRef} className={`${maxHeight} overflow-y-auto`}>
       {rows.length === 0 ? <p className="px-2 py-3 text-sm text-muted">No moves yet.</p> : null}
       {rows.map((r) => (
         <div key={r.n} className={`grid grid-cols-[2.5rem_1fr_1fr] items-center gap-1 px-1 ${r.n % 2 === 0 ? 'bg-white/[0.025]' : ''}`}>
