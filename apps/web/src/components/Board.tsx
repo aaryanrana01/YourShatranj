@@ -17,10 +17,12 @@ export interface BoardProps {
   arrows?: Arrow[];
   /** Let the player queue one move during the opponent's turn. */
   premoves?: boolean;
+  /** A small badge in the corner of a square, e.g. a review's "??" on the move just played. */
+  badge?: { square: string; node: React.ReactNode } | null;
 }
 
-const LIGHT = '#e9dfc9';
-const DARK = '#7b8c6e';
+const LIGHT = '#edeed1';
+const DARK = '#779952';
 
 function safeChess(fen: string): Chess | null {
   try {
@@ -35,7 +37,7 @@ function safeChess(fen: string): Chess | null {
  * promotion picker, and premoves. Moves are checked with chess.js before
  * being handed on, so an illegal drop snaps straight back.
  */
-export function Board({ id, fen, orientation = 'white', movable, onMove, lastMove, arrows, premoves }: BoardProps) {
+export function Board({ id, fen, orientation = 'white', movable, onMove, lastMove, arrows, premoves, badge }: BoardProps) {
   const chess = useMemo(() => safeChess(fen), [fen]);
   const turn = chess?.turn() ?? 'w';
   const [selected, setSelected] = useState<Square | null>(null);
@@ -137,8 +139,8 @@ export function Board({ id, fen, orientation = 'white', movable, onMove, lastMov
   const squareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
     if (lastMove) {
-      styles[lastMove.from] = { background: 'rgba(242, 184, 75, 0.38)' };
-      styles[lastMove.to] = { background: 'rgba(242, 184, 75, 0.5)' };
+      styles[lastMove.from] = { background: 'rgba(246, 236, 92, 0.5)' };
+      styles[lastMove.to] = { background: 'rgba(246, 236, 92, 0.62)' };
     }
     if (chess?.inCheck()) {
       const kingSquare = chess
@@ -147,14 +149,14 @@ export function Board({ id, fen, orientation = 'white', movable, onMove, lastMov
         .find((p) => p && p.type === 'k' && p.color === chess.turn())?.square;
       if (kingSquare) styles[kingSquare] = { background: 'radial-gradient(circle, rgba(224,86,91,0.9) 0%, rgba(224,86,91,0) 75%)' };
     }
-    if (selected) styles[selected] = { ...styles[selected], boxShadow: 'inset 0 0 0 3px rgba(242,184,75,0.9)' };
+    if (selected) styles[selected] = { ...styles[selected], background: 'rgba(246, 236, 92, 0.62)' };
     for (const t of targets) {
       const occupied = !!chess?.get(t);
       styles[t] = {
         ...styles[t],
         background: occupied
-          ? 'radial-gradient(circle, transparent 58%, rgba(15,19,27,0.35) 60%)'
-          : 'radial-gradient(circle, rgba(15,19,27,0.35) 22%, transparent 24%)',
+          ? 'radial-gradient(circle, transparent 58%, rgba(0,0,0,0.18) 60%)'
+          : 'radial-gradient(circle, rgba(0,0,0,0.18) 22%, transparent 24%)',
       };
     }
     if (premove) {
@@ -164,7 +166,18 @@ export function Board({ id, fen, orientation = 'white', movable, onMove, lastMov
     return styles;
   }, [lastMove, chess, selected, targets, premove]);
 
+  // Position of the badge's square, as a percentage of the board, from the viewer's side.
+  const badgePos = (() => {
+    if (!badge) return null;
+    const file = badge.square.charCodeAt(0) - 97;
+    const rank = Number(badge.square[1]) - 1;
+    const col = orientation === 'white' ? file : 7 - file;
+    const row = orientation === 'white' ? 7 - rank : rank;
+    return { left: `${((col + 1) / 8) * 100}%`, top: `${(row / 8) * 100}%` };
+  })();
+
   return (
+    <div className="relative">
     <Chessboard
       id={id}
       position={fen}
@@ -179,9 +192,18 @@ export function Board({ id, fen, orientation = 'white', movable, onMove, lastMov
       customArrows={arrows}
       customLightSquareStyle={{ backgroundColor: LIGHT }}
       customDarkSquareStyle={{ backgroundColor: DARK }}
-      customBoardStyle={{ borderRadius: '6px', boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}
+      customBoardStyle={{ borderRadius: '4px' }}
       animationDuration={150}
       arePremovesAllowed={false}
     />
+      {badge && badgePos ? (
+        <div
+          className="pointer-events-none absolute z-10 -translate-x-[70%] -translate-y-[30%] drop-shadow"
+          style={badgePos}
+        >
+          {badge.node}
+        </div>
+      ) : null}
+    </div>
   );
 }

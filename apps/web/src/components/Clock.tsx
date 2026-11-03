@@ -5,6 +5,7 @@ import { formatClock } from '../lib/format';
  * Counts down locally for smoothness, from the last value the server sent
  * (`ms` at local time `syncedAt`). The server's numbers always win: every
  * server message resets `ms` and `syncedAt`.
+ * The running clock is a bright white box; under 20 s it turns red.
  */
 export function Clock({ ms, running, syncedAt, label }: { ms: number; running: boolean; syncedAt: number; label: string }) {
   const [now, setNow] = useState(() => performance.now());
@@ -19,8 +20,8 @@ export function Clock({ ms, running, syncedAt, label }: { ms: number; running: b
   return (
     <div
       aria-label={`${label} clock`}
-      className={`min-w-28 rounded-lg px-4 py-2 text-right font-mono text-2xl font-bold tabular-nums transition ${
-        running ? (low ? 'bg-blunder text-white' : 'bg-ink-200 text-ink-950') : 'bg-ink-800 text-ink-400'
+      className={`tabular min-w-[7.5rem] rounded-md px-3 py-1.5 text-right text-[1.6rem] font-bold leading-none ${
+        running ? (low ? 'bg-blunder text-white' : 'bg-ink text-felt') : 'bg-[#1d1c1a] text-muted'
       }`}
     >
       {formatClock(shown)}

@@ -1,21 +1,35 @@
+@import '@fontsource-variable/figtree';
 @import 'tailwindcss';
 
-/* Rookery's own palette: deep ink background, warm amber accent. */
+/*
+ * Rookery theme: warm charcoal "club room" surfaces, a classic green-and-cream
+ * board, and one strong green for the main action on every screen.
+ */
 @theme {
-  --color-ink-950: #0f131b;
-  --color-ink-900: #151b26;
-  --color-ink-800: #1b2230;
-  --color-ink-700: #252e3f;
-  --color-ink-600: #344056;
-  --color-ink-400: #7d8aa3;
-  --color-ink-200: #c9d1e0;
-  --color-amber-accent: #f2b84b;
-  --color-good: #5fbf8a;
-  --color-inacc: #e6c35c;
-  --color-mistake: #e8914a;
-  --color-blunder: #e0565b;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --color-felt: #2a2926; /* page background */
+  --color-panel: #353330; /* cards and side panels */
+  --color-raised: #403d39; /* inputs, rows, secondary buttons */
+  --color-line: #4b4843; /* borders */
+  --color-ink: #f1efe9; /* main text */
+  --color-muted: #a8a399; /* secondary text */
+  --color-faint: #7d786f;
+
+  --color-board-light: #edeed1;
+  --color-board-dark: #779952;
+
+  --color-go: #6fa33f; /* primary action */
+  --color-go-hi: #7fb64c;
+  --color-go-lo: #557f2e;
+
+  /* Move classifications */
+  --color-best: #6fa33f;
+  --color-excellent: #96bc4b;
+  --color-good: #8fae86;
+  --color-inaccuracy: #f0c14b;
+  --color-mistake: #e5892a;
+  --color-blunder: #d23f3a;
+
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 html,
@@ -25,10 +39,31 @@ body,
 }
 
 body {
-  background: var(--color-ink-950);
-  color: var(--color-ink-200);
+  background: var(--color-felt);
+  color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Clocks, scores and counts line up when numbers change. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-go-hi);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
 }
 
 @utility btn {
@@ -36,29 +71,36 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 0.5rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  transition: filter 120ms, background-color 120ms;
+  border-radius: 0.6rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition:
+    background-color 120ms,
+    transform 80ms;
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
   &:disabled {
     cursor: not-allowed;
     opacity: 0.5;
   }
 }
 
-@utility btn-primary {
-  @apply btn bg-amber-accent text-ink-950 hover:brightness-110;
+/* The one loud button per screen. */
+@utility btn-go {
+  @apply btn bg-go text-white hover:bg-go-hi;
+  box-shadow: inset 0 -3px 0 var(--color-go-lo);
 }
 
-@utility btn-ghost {
-  @apply btn bg-ink-700 text-ink-200 hover:bg-ink-600;
+@utility btn-quiet {
+  @apply btn bg-raised text-ink hover:bg-line;
 }
 
-@utility card {
-  @apply rounded-xl border border-ink-700 bg-ink-900;
+@utility panel {
+  @apply rounded-xl bg-panel;
 }
 
 @utility input {
-  @apply w-full rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-sm text-ink-200 outline-none placeholder:text-ink-400 focus:border-amber-accent;
+  @apply w-full rounded-lg border border-line bg-felt px-3 py-2 text-sm text-ink outline-none placeholder:text-faint focus:border-go;
 }

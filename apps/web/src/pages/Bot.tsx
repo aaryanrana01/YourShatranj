@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Chess } from 'chess.js';
 import { Board } from '../components/Board';
 import { MoveList } from '../components/MoveList';
+import { PlayerBar } from '../components/PlayerBar';
+import { useAuth } from '../lib/auth';
 import { Engine } from '../engine/stockfish';
 
 /** Strength levels: Stockfish "Skill Level" (0–20) plus a search-depth cap for the weakest ones. */
@@ -23,6 +25,7 @@ const LEVELS = [
  */
 export function Bot() {
   const navigate = useNavigate();
+  const user = useAuth((st) => st.user);
   const engineRef = useRef<Engine | null>(null);
   const [game, setGame] = useState(() => new Chess());
   const [fen, setFen] = useState(game.fen());
@@ -97,62 +100,90 @@ export function Bot() {
       ? 'Draw'
       : null;
 
+  const botColor: 'w' | 'b' = color === 'w' ? 'b' : 'w';
+  const botBar = <PlayerBar name={`Stockfish · level ${level + 1}`} color={botColor} note={LEVELS[level]!.name.split(' · ')[1]} right={thinking ? <span className="text-sm text-muted">Thinking…</span> : null} />;
+  const youBar = <PlayerBar name={user?.username ?? 'You'} color={color} />;
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,600px)_1fr]">
-      <Board
-        id="bot"
-        fen={fen}
-        orientation={color === 'w' ? 'white' : 'black'}
-        movable={started && !over ? color : null}
-        onMove={playerMove}
-        lastMove={last ? { from: last.from, to: last.to } : null}
-        premoves
-      />
-      <div className="space-y-4">
-        <section className="card space-y-3 p-4">
-          <h1 className="text-xl font-extrabold text-white">Play against Stockfish</h1>
-          <label className="block text-sm">
-            <span className="mb-1 block text-ink-400">Strength</span>
-            <select className="input" value={level} onChange={(e) => setLevel(Number(e.target.value))} disabled={started && !over}>
-              {LEVELS.map((l, i) => (
-                <option key={l.name} value={i}>{l.name}</option>
-              ))}
-            </select>
-          </label>
-          <div className="flex gap-2">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <section aria-label="Board">
+        <div className="mx-auto w-full max-w-[min(100%,calc(100vh-150px))]">
+          {botBar}
+          <Board
+            id="bot"
+            fen={fen}
+            orientation={color === 'w' ? 'white' : 'black'}
+            movable={started && !over ? color : null}
+            onMove={playerMove}
+            lastMove={last ? { from: last.from, to: last.to } : null}
+            premoves
+          />
+          {youBar}
+        </div>
+      </section>
+
+      <aside className="panel flex flex-col gap-4 p-4 lg:self-start">
+        <h1 className="text-lg font-extrabold">Play the bot</h1>
+
+        <fieldset disabled={started && !over} className="space-y-2">
+          <legend className="mb-2 text-sm font-bold text-muted">Strength</legend>
+          <div className="grid grid-cols-4 gap-2">
+            {LEVELS.map((l, i) => (
+              <button
+                key={l.name}
+                type="button"
+                onClick={() => setLevel(i)}
+                title={l.name.split(' · ')[1]}
+                className={`tabular rounded-md py-2 font-extrabold disabled:opacity-50 ${
+                  level === i ? 'bg-go text-white' : 'bg-raised text-ink hover:bg-line'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm text-muted">{LEVELS[level]!.name.split(' · ')[1]}</p>
+        </fieldset>
+
+        <fieldset disabled={started && !over}>
+          <legend className="mb-2 text-sm font-bold text-muted">You play</legend>
+          <div className="grid grid-cols-2 gap-2">
             {(['w', 'b'] as const).map((c) => (
               <button
                 key={c}
                 type="button"
-                className={color === c ? 'btn-primary' : 'btn-ghost'}
-                disabled={started && !over}
                 onClick={() => setColor(c)}
+                className={`rounded-md py-2 font-bold disabled:opacity-50 ${
+                  color === c ? 'bg-go text-white' : 'bg-raised text-ink hover:bg-line'
+                }`}
               >
-                Play {c === 'w' ? 'White' : 'Black'}
+                {c === 'w' ? 'White' : 'Black'}
               </button>
             ))}
           </div>
-          <button type="button" className="btn-primary w-full" onClick={newGame}>
-            {started ? 'New game' : 'Start'}
-          </button>
-          {thinking ? <p className="text-sm text-ink-400">Stockfish is thinking…</p> : null}
-          {result ? (
-            <div className="rounded-lg bg-ink-800 p-3">
-              <p className="font-bold text-white">{result}</p>
-              <button
-                type="button"
-                className="btn-ghost mt-2"
-                onClick={() => navigate('/analysis', { state: { pgn: game.pgn(), autoReview: true } })}
-              >
-                Review this game
-              </button>
-            </div>
-          ) : null}
-        </section>
-        <section className="card p-3">
-          <MoveList moves={history} current={history.length} />
-        </section>
-      </div>
+        </fieldset>
+
+        <button type="button" className="btn-go py-3.5 text-lg" onClick={newGame}>
+          {started ? 'New game' : 'Start'}
+        </button>
+
+        {result ? (
+          <div className="rounded-xl bg-raised p-4 text-center">
+            <p className="text-lg font-extrabold">{result}</p>
+            <button
+              type="button"
+              className="btn-quiet mt-3 w-full"
+              onClick={() => navigate('/analysis', { state: { pgn: game.pgn(), autoReview: true } })}
+            >
+              Review this game
+            </button>
+          </div>
+        ) : null}
+
+        <div className="rounded-lg bg-felt/60 py-1">
+          <MoveList moves={history} current={history.length} maxHeight="max-h-[40vh]" />
+        </div>
+      </aside>
     </div>
   );
 }

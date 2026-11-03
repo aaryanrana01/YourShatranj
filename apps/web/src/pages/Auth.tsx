@@ -28,11 +28,11 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   }
 
   return (
-    <div className="mx-auto max-w-sm">
-      <h1 className="text-2xl font-extrabold text-white">{isLogin ? 'Welcome back' : 'Create your account'}</h1>
-      <form onSubmit={submit} className="card mt-6 space-y-4 p-6">
+    <div className="mx-auto max-w-sm pt-6">
+      <h1 className="text-center text-3xl font-extrabold">{isLogin ? 'Welcome back' : 'Create your account'}</h1>
+      <form onSubmit={submit} className="panel mt-6 space-y-4 p-6">
         <label className="block text-sm">
-          <span className="mb-1 block text-ink-400">Username</span>
+          <span className="mb-1 block text-muted">Username</span>
           <input
             className="input"
             value={username}
@@ -46,7 +46,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           />
         </label>
         <label className="block text-sm">
-          <span className="mb-1 block text-ink-400">Password</span>
+          <span className="mb-1 block text-muted">Password</span>
           <input
             className="input"
             type="password"
@@ -57,17 +57,17 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             maxLength={128}
             required
           />
-          {!isLogin ? <span className="mt-1 block text-xs text-ink-400">At least 8 characters.</span> : null}
+          {!isLogin ? <span className="mt-1 block text-xs text-muted">At least 8 characters.</span> : null}
         </label>
         {error ? <p className="text-sm text-blunder">{error}</p> : null}
-        <button type="submit" className="btn-primary w-full" disabled={busy}>
+        <button type="submit" className="btn-go w-full py-3 text-base" disabled={busy}>
           {busy ? 'Please wait…' : isLogin ? 'Log in' : 'Sign up'}
         </button>
-        <p className="text-center text-sm text-ink-400">
+        <p className="text-center text-sm text-muted">
           {isLogin ? (
-            <>New here? <Link className="text-amber-accent" to="/register">Create an account</Link></>
+            <>New here? <Link className="font-bold text-go-hi hover:underline" to="/register">Create an account</Link></>
           ) : (
-            <>Have an account? <Link className="text-amber-accent" to="/login">Log in</Link></>
+            <>Have an account? <Link className="font-bold text-go-hi hover:underline" to="/login">Log in</Link></>
           )}
         </p>
       </form>

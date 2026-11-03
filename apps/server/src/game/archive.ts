@@ -3,7 +3,8 @@ import type { TimeClass } from '@chess/shared';
 import type { Db } from '../db/index.js';
 import { games, moves, ratings } from '../db/schema.js';
 import { DEFAULT_GLICKO, rateGame } from './glicko2.js';
-import { replay } from './rules.js';
+import { Chess } from 'chess.js';
+import { tryMove } from './rules.js';
 import type { StoredGame } from './types.js';
 
 const TERMINATION: Record<string, string> = {
@@ -21,8 +22,22 @@ const TERMINATION: Record<string, string> = {
 };
 
 /** Standard PGN so the game opens in any chess tool, including our own analysis board. */
+/** "0:04:58.3": PGN clock comment format, read by most chess tools (and our review's time chart). */
+function clk(ms: number): string {
+  const total = Math.max(0, ms) / 1000;
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = (total % 60).toFixed(1).padStart(4, '0');
+  return `${h}:${String(m).padStart(2, '0')}:${s}`;
+}
+
 export function buildPgn(game: StoredGame, siteOrigin: string): string {
-  const chess = replay(game.moves.map((m) => m.uci));
+  // Replay move by move so each move can carry the mover's remaining time.
+  const chess = new Chess();
+  for (const m of game.moves) {
+    if (!tryMove(chess, m.uci)) throw new Error(`Corrupt move list: ${m.uci}`);
+    chess.setComment(`[%clk ${clk(m.clockMs)}]`);
+  }
   const date = new Date(game.createdAt);
   const pad = (n: number) => String(n).padStart(2, '0');
   const winnerName = game.result === '1-0' ? game.white.username : game.result === '0-1' ? game.black.username : '';
