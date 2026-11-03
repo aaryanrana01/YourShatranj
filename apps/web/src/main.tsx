@@ -5,6 +5,7 @@ import { Layout } from './components/Layout';
 import { useAuth } from './lib/auth';
 import { AuthPage } from './pages/Auth';
 import { Play } from './pages/Play';
+import { Welcome } from './pages/Welcome';
 import './styles.css';
 
 // Pages load on demand, so the lobby doesn't download the board and engine code up front.
@@ -29,12 +30,13 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Suspense fallback={<p className="p-6 text-ink-400">Loading…</p>}>
+      <Suspense fallback={<p className="p-6 text-muted">Loading…</p>}>
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Play />} />
           <Route path="login" element={<AuthPage mode="login" />} />
           <Route path="register" element={<AuthPage mode="register" />} />
+          <Route path="welcome" element={<Welcome />} />
           <Route path="game/:id" element={<RequireAuth><Game /></RequireAuth>} />
           <Route path="analysis" element={<Analysis />} />
           <Route path="import" element={<Import />} />
@@ -44,8 +46,8 @@ function App() {
             path="*"
             element={
               <div className="py-20 text-center">
-                <p className="text-2xl font-bold text-white">Page not found</p>
-                <Link to="/" className="mt-4 inline-block text-amber-accent">Back to the lobby</Link>
+                <p className="text-2xl font-bold text-ink">Page not found</p>
+                <Link to="/" className="mt-4 inline-block font-bold text-go-hi hover:underline">Back to the lobby</Link>
               </div>
             }
           />

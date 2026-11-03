@@ -98,6 +98,30 @@ export async function register(username: string, password: string): Promise<Sess
   return body.user;
 }
 
+/** Which sign-in options the server has configured (the Google button is hidden when it's off). */
+export async function getProviders(): Promise<{ google: boolean }> {
+  try {
+    return await parse<{ google: boolean }>(await raw('/api/auth/providers'));
+  } catch {
+    return { google: false };
+  }
+}
+
+/** After Google sends a new user back: the suggested username, or null if no sign-up is in progress. */
+export async function googlePending(): Promise<{ suggestion: string } | null> {
+  const res = await raw('/api/auth/google/pending');
+  return res.ok ? parse<{ suggestion: string }>(res) : null;
+}
+
+/** Finishes a Google sign-up with the chosen username and starts the session. */
+export async function completeGoogle(username: string): Promise<SessionUser> {
+  const body = await parse<{ accessToken: string; user: SessionUser }>(
+    await raw('/api/auth/google/complete', { method: 'POST', body: JSON.stringify({ username }) }),
+  );
+  setSession(body.accessToken, body.user);
+  return body.user;
+}
+
 export async function logout(): Promise<void> {
   await raw('/api/auth/logout', { method: 'POST' }).catch(() => {});
   setSession(null, null);

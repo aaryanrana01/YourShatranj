@@ -69,6 +69,12 @@ describe('HTTP basics and security', () => {
     expect(res.headers.get('x-powered-by')).toBeNull();
   });
 
+  it('hides "Continue with Google" when it is not configured', async () => {
+    const res = await http(base, '/api/auth/providers');
+    expect(res.body).toEqual({ google: false });
+    expect((await http(base, '/api/auth/google')).status).toBe(404);
+  });
+
   it('rejects bad registration input', async () => {
     await resetLimits();
     const res = await http(base, '/api/auth/register', {

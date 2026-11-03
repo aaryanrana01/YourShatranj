@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import type { Redis } from 'ioredis';
 import type pg from 'pg';
+import type { GoogleProvider } from './auth/google.js';
 import type { TokenService } from './auth/tokens.js';
 import type { ChessComClient } from './chesscom.js';
 import type { Config } from './config.js';
@@ -11,6 +12,7 @@ import type { GameService } from './game/service.js';
 import { apiRouter } from './http/api.js';
 import { authRouter } from './http/auth.js';
 import { errorHandler } from './http/errors.js';
+import { googleRouter } from './http/google.js';
 import type { Logger } from './logger.js';
 import type { RateLimiter } from './security/rateLimit.js';
 import type { UserRepo } from './users.js';
@@ -25,6 +27,8 @@ export function createApp(deps: {
   games: GameService;
   chessCom: ChessComClient;
   limiter: RateLimiter;
+  /** Present only when GOOGLE_CLIENT_ID/SECRET are set (or a test passes a fake). */
+  google?: GoogleProvider;
 }) {
   const { config, log, redis, pool } = deps;
   const app = express();
@@ -67,6 +71,21 @@ export function createApp(deps: {
     }
   });
 
+  if (deps.google) {
+    app.use(
+      '/api/auth/google',
+      googleRouter({
+        provider: deps.google,
+        users: deps.users,
+        tokens: deps.tokens,
+        limiter: deps.limiter,
+        appOrigin: config.APP_ORIGIN,
+        secureCookies: config.NODE_ENV === 'production',
+        secret: config.JWT_ACCESS_SECRET,
+        log,
+      }),
+    );
+  }
   app.use(
     '/api/auth',
     authRouter({
@@ -75,6 +94,7 @@ export function createApp(deps: {
       limiter: deps.limiter,
       appOrigin: config.APP_ORIGIN,
       secureCookies: config.NODE_ENV === 'production',
+      googleEnabled: Boolean(deps.google),
     }),
   );
   app.use('/api', apiRouter(deps));

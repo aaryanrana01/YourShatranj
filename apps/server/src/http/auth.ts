@@ -8,6 +8,17 @@ import { HttpError, parse } from './errors.js';
 
 export const REFRESH_COOKIE = 'rt';
 
+/** The refresh-token cookie's settings, shared by password and Google sign-in. */
+export function refreshCookieOptions(secure: boolean): CookieOptions {
+  return {
+    httpOnly: true, // JavaScript can't read it, so an XSS bug can't steal it
+    secure, // HTTPS only in production
+    sameSite: 'strict', // never sent on requests started by other sites (CSRF protection)
+    path: '/api/auth', // only sent to the auth endpoints that need it
+    maxAge: REFRESH_TTL_SEC * 1000,
+  };
+}
+
 export interface AuthedRequest extends Request {
   user?: { id: string; username: string };
 }
@@ -30,17 +41,16 @@ export function authRouter(deps: {
   limiter: RateLimiter;
   appOrigin: string;
   secureCookies: boolean;
+  /** Whether "Continue with Google" is configured, so the site knows to show the button. */
+  googleEnabled: boolean;
 }) {
-  const { users, tokens, limiter, appOrigin, secureCookies } = deps;
+  const { users, tokens, limiter, appOrigin, secureCookies, googleEnabled } = deps;
   const router = Router();
+  const cookieOptions = refreshCookieOptions(secureCookies);
 
-  const cookieOptions: CookieOptions = {
-    httpOnly: true, // JavaScript can't read it, so an XSS bug can't steal it
-    secure: secureCookies, // HTTPS only in production
-    sameSite: 'strict', // never sent on requests started by other sites (CSRF protection)
-    path: '/api/auth', // only sent to the auth endpoints that need it
-    maxAge: REFRESH_TTL_SEC * 1000,
-  };
+  router.get('/providers', (_req, res) => {
+    res.json({ google: googleEnabled });
+  });
 
   /** Cookie-authenticated endpoints also check Origin: a second CSRF guard on top of SameSite. */
   const sameOrigin = (req: Request) => {

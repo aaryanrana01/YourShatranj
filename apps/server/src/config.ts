@@ -29,6 +29,12 @@ const envSchema = z.object({
   // Set when the app runs behind a proxy (Render, Koyeb, Caddy) so req.ip is the real client IP.
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  // "Continue with Google". Both or neither: without them the Google button is simply hidden.
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+}).refine((c) => Boolean(c.GOOGLE_CLIENT_ID) === Boolean(c.GOOGLE_CLIENT_SECRET), {
+  message: 'Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or neither',
+  path: ['GOOGLE_CLIENT_SECRET'],
 });
 
 export type Config = z.infer<typeof envSchema>;

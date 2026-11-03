@@ -25,7 +25,10 @@ export const users = pgTable('users', {
   username: varchar('username', { length: 20 }).notNull().unique(),
   // Lower-cased copy so "Magnus" and "magnus" can't both register.
   usernameKey: varchar('username_key', { length: 20 }).notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
+  // Null for accounts that only sign in with Google.
+  passwordHash: text('password_hash'),
+  // Google's permanent account id ("sub"). We store only this, not the email address.
+  googleSub: varchar('google_sub', { length: 255 }).unique(),
   isBanned: boolean('is_banned').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

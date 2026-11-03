@@ -20,6 +20,8 @@ export const passwordSchema = z
   .max(128, 'Password must be at most 128 characters');
 
 export const registerSchema = z.object({ username: usernameSchema, password: passwordSchema }).strict();
+/** Finishing a Google sign-up: the only thing the new user chooses is a username. */
+export const googleCompleteSchema = z.object({ username: usernameSchema }).strict();
 export const loginSchema = z
   .object({ username: z.string().min(1).max(20), password: z.string().min(1).max(128) })
   .strict();

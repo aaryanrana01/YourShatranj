@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { Redis } from 'ioredis';
 import { createApp } from './app.js';
+import { GoogleOAuth, type GoogleProvider } from './auth/google.js';
 import { TokenService } from './auth/tokens.js';
 import { ChessComClient } from './chesscom.js';
 import type { Config } from './config.js';
@@ -15,8 +16,8 @@ import { RateLimiter } from './security/rateLimit.js';
 import { createIo, registerSocketHandlers, socketEvents } from './socket.js';
 import { UserRepo } from './users.js';
 
-/** Wires every part together. Tests build the same server in-process. */
-export async function buildServer(config: Config, log: Logger) {
+/** Wires every part together. Tests build the same server in-process (and may pass a fake Google). */
+export async function buildServer(config: Config, log: Logger, overrides: { google?: GoogleProvider } = {}) {
   const { db, pool } = createDb(config.DATABASE_URL);
   await runMigrations(pool);
 
@@ -36,7 +37,12 @@ export async function buildServer(config: Config, log: Logger) {
   const io = createIo(httpServer, config, redis);
   const games = new GameService(new GameStore(redis), new GameArchive(db, config.APP_ORIGIN), socketEvents(io), log);
   const matchmaker = new Matchmaker(redis, games, log);
-  const app = createApp({ config, log, redis, pool, users, tokens, games, chessCom, limiter });
+  const google =
+    overrides.google ??
+    (config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET
+      ? new GoogleOAuth(config.GOOGLE_CLIENT_ID, config.GOOGLE_CLIENT_SECRET)
+      : undefined);
+  const app = createApp({ config, log, redis, pool, users, tokens, games, chessCom, limiter, google });
   httpServer.on('request', app);
   const { sweepPresence } = registerSocketHandlers(io, { config, tokens, users, games, matchmaker, log });
 

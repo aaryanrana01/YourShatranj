@@ -188,6 +188,21 @@ What it does, and why:
 | `REDIS_ADAPTER` | no | `true` only when running 2+ server instances |
 | `CHESSCOM_CONTACT` | recommended | Your email or URL; chess.com asks API clients to identify themselves |
 | `LOG_LEVEL` | no | Default `info` |
+| `GOOGLE_CLIENT_ID` | no | Turns on "Continue with Google" (set together with the secret) |
+| `GOOGLE_CLIENT_SECRET` | no | From the same Google OAuth client |
+
+### Continue with Google
+
+Sign-in uses Google's authorization-code flow with PKCE, a `state` value
+(stops forged sign-ins) and a `nonce` (stops replayed tokens). The server
+verifies Google's signed ID token itself and stores only Google's account id,
+not the email address. New Google users choose a username once on `/welcome`.
+Google-only accounts have no password, so there's nothing to guess.
+
+To enable it, create an OAuth client (type **Web application**) in Google
+Cloud Console, add `<APP_ORIGIN>/api/auth/google/callback` as an authorised
+redirect URI (and `http://localhost:5173/api/auth/google/callback` for
+development), then set the two variables above.
 
 ## Tests
 

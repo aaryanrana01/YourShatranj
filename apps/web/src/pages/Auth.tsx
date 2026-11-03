@@ -1,15 +1,24 @@
 import { type FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { GoogleButton, useGoogleEnabled } from '../components/GoogleButton';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+
+/** Messages for the server's redirects back from Google (/login?error=…). */
+const GOOGLE_ERRORS: Record<string, string> = {
+  google: 'Google sign-in didn’t finish. Please try again.',
+  suspended: 'This account is suspended.',
+};
 
 export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const [error, setError] = useState<string | null>(() => GOOGLE_ERRORS[params.get('error') ?? ''] ?? null);
   const [busy, setBusy] = useState(false);
+  const googleEnabled = useGoogleEnabled();
   const isLogin = mode === 'login';
 
   async function submit(e: FormEvent) {
@@ -31,6 +40,16 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     <div className="mx-auto max-w-sm pt-6">
       <h1 className="text-center text-3xl font-extrabold">{isLogin ? 'Welcome back' : 'Create your account'}</h1>
       <form onSubmit={submit} className="panel mt-6 space-y-4 p-6">
+        {googleEnabled ? (
+          <>
+            <GoogleButton />
+            <div className="flex items-center gap-3 text-xs text-faint" aria-hidden="true">
+              <span className="h-px flex-1 bg-line" />
+              or with a username
+              <span className="h-px flex-1 bg-line" />
+            </div>
+          </>
+        ) : null}
         <label className="block text-sm">
           <span className="mb-1 block text-muted">Username</span>
           <input

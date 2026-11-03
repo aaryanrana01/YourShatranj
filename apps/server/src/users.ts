@@ -16,11 +16,49 @@ export class UserRepo {
 
   /** Creates the user and their three rating rows together, or not at all. Returns null if the name is taken. */
   async create(username: string, passwordHash: string): Promise<{ id: string; username: string } | null> {
+    return this.insertUser({ username, passwordHash, googleSub: null });
+  }
+
+  /**
+   * Creates an account that signs in with Google (no password).
+   * 'username_taken' if the name is in use; 'already_linked' if this Google
+   * account already has a user (e.g. the form was submitted twice).
+   */
+  async createWithGoogle(
+    username: string,
+    googleSub: string,
+  ): Promise<{ id: string; username: string } | 'username_taken' | 'already_linked'> {
+    if (await this.findByGoogleSub(googleSub)) return 'already_linked';
+    const user = await this.insertUser({ username, passwordHash: null, googleSub });
+    if (user) return user;
+    // The insert can also lose a race on google_sub; tell the two cases apart.
+    return (await this.findByGoogleSub(googleSub)) ? 'already_linked' : 'username_taken';
+  }
+
+  async findByGoogleSub(googleSub: string) {
+    const [user] = await this.db.select().from(users).where(eq(users.googleSub, googleSub));
+    return user ?? null;
+  }
+
+  async isUsernameTaken(username: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.usernameKey, username.toLowerCase()));
+    return Boolean(row);
+  }
+
+  private async insertUser(values: {
+    username: string;
+    passwordHash: string | null;
+    googleSub: string | null;
+  }): Promise<{ id: string; username: string } | null> {
+    const { username, passwordHash, googleSub } = values;
     try {
       return await this.db.transaction(async (tx) => {
         const [user] = await tx
           .insert(users)
-          .values({ username, usernameKey: username.toLowerCase(), passwordHash })
+          .values({ username, usernameKey: username.toLowerCase(), passwordHash, googleSub })
           .returning({ id: users.id, username: users.username });
         if (!user) throw new Error('insert returned nothing');
         await tx.insert(ratings).values(TIME_CLASSES.map((timeClass) => ({ userId: user.id, timeClass })));
