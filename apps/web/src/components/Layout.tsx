@@ -2,7 +2,8 @@ import type { ComponentType } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { closeSocket } from '../lib/socket';
-import { AnalysisIcon, BotIcon, ImportIcon, LogoutIcon, PlayIcon, RookIcon, UserIcon } from './Icons';
+import { AnalysisIcon, BotIcon, ImportIcon, LogoutIcon, PlayIcon, UserIcon } from './Icons';
+import { KingLogo } from './Logo';
 
 const NAV: { to: string; label: string; Icon: ComponentType<{ className?: string }> }[] = [
   { to: '/', label: 'Play', Icon: PlayIcon },
@@ -46,11 +47,11 @@ export function Layout() {
     <div className="flex min-h-full flex-col md:flex-row">
       {/* Sidebar (tablet and up) */}
       <aside className="sticky top-0 hidden h-screen shrink-0 flex-col bg-[#211f1d] px-2 py-4 md:flex md:w-[68px] lg:w-[180px]">
-        <Link to="/" className="mb-6 flex items-center gap-2 px-2.5" aria-label="Rookery home">
+        <Link to="/" className="mb-6 flex items-center gap-2 px-2.5" aria-label="YourShatranj home">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-go text-white">
-            <RookIcon className="h-6 w-6" />
+            <KingLogo className="h-7 w-7" />
           </span>
-          <span className="text-xl font-extrabold tracking-tight md:hidden lg:inline">Rookery</span>
+          <span className="text-xl font-extrabold tracking-tight md:hidden lg:inline">YourShatranj</span>
         </Link>
         <nav className="flex flex-col gap-1" aria-label="Main">
           {NAV.map((n) => navItem(n.to, n.label, n.Icon))}
@@ -89,9 +90,9 @@ export function Layout() {
 
       {/* Top bar (phones) */}
       <header className="sticky top-0 z-20 flex items-center gap-1 bg-[#211f1d] px-3 py-2 md:hidden">
-        <Link to="/" className="mr-2 flex items-center gap-2" aria-label="Rookery home">
+        <Link to="/" className="mr-2 flex items-center gap-2" aria-label="YourShatranj home">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-go text-white">
-            <RookIcon className="h-5 w-5" />
+            <KingLogo className="h-6 w-6" />
           </span>
         </Link>
         {NAV.map(({ to, label, Icon }) => (

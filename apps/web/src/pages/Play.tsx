@@ -70,7 +70,7 @@ function PlayCard({ activeGame }: { activeGame: string | null }) {
   const navigate = useNavigate();
   const [tc, setTc] = useState<TimeControlKey>(() => {
     try {
-      const saved = localStorage.getItem('rookery:tc');
+      const saved = localStorage.getItem('yourshatranj:tc');
       return saved && (TIME_CONTROLS as readonly string[]).includes(saved) ? (saved as TimeControlKey) : '600+0';
     } catch {
       return '600+0';
@@ -108,7 +108,7 @@ function PlayCard({ activeGame }: { activeGame: string | null }) {
     setTc(key);
     setShowAll(false);
     try {
-      localStorage.setItem('rookery:tc', key);
+      localStorage.setItem('yourshatranj:tc', key);
     } catch {
       /* private mode: fine, just not remembered */
     }

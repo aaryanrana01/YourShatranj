@@ -1,4 +1,4 @@
-# Rookery — real-time chess with free, unlimited analysis
+# YourShatranj — real-time chess with free, unlimited analysis
 
 Play rated real-time games against other people, then review every game with
 Stockfish as often as you like. Import games from chess.com by username and
@@ -129,7 +129,7 @@ new migration file.
 
 ## Calibrate accuracy to chess.com
 
-chess.com doesn't publish its accuracy formula, so out of the box Rookery
+chess.com doesn't publish its accuracy formula, so out of the box YourShatranj
 uses Lichess's, which usually comes out 10+ points higher than chess.com's.
 chess.com *does* publish its accuracy for every game that has been reviewed,
 so the gap can be measured and fitted away:
@@ -245,7 +245,7 @@ one machine with Docker Compose.
 5. **Install Docker:** `curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker $USER`, then log out and back in.
 6. **Configure:**
    ```bash
-   git clone <your repo> rookery && cd rookery
+   git clone <your repo> yourshatranj && cd yourshatranj
    cp .env.example .env
    nano .env   # set DOMAIN, the two JWT/refresh secrets, POSTGRES_PASSWORD, CHESSCOM_CONTACT
    ```
@@ -258,13 +258,23 @@ one machine with Docker Compose.
 
 ### Option B — Render + Neon + Upstash (no server to manage, but it sleeps)
 
-1. **Neon** (Postgres): create a project, copy the connection string (keep `?sslmode=require`).
-2. **Upstash** (Redis): create a database, copy the `rediss://` URL.
+Put all three in the same region (Singapore is closest to India) so each
+move's round trip between the server and Redis stays short.
+
+1. **Neon** (Postgres): create a project, then copy the connection string with
+   connection pooling **off** (keep `?sslmode=require`). Startup migrations
+   need a direct connection.
+2. **Upstash** (Redis): create a database with eviction **off**, copy the `rediss://` URL.
 3. **Render**: New → Web Service → connect your GitHub repo → it detects the
-   `Dockerfile` → instance type **Free** → health check path `/api/health` →
-   environment variables: `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`,
-   `REFRESH_TOKEN_SECRET`, `APP_ORIGIN=https://<name>.onrender.com`,
-   `TRUST_PROXY=1`, `CHESSCOM_CONTACT`.
+   `Dockerfile` → instance type **Free** → environment variables:
+   `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `REFRESH_TOKEN_SECRET`,
+   `APP_ORIGIN=https://<name>.onrender.com` (no trailing slash),
+   `TRUST_PROXY=1`, `PORT=4000`, `CHESSCOM_CONTACT`.
+   Leave the health check path **empty**: `/api/health` queries Postgres and
+   Redis, and Render calls it every few seconds, which would use up Upstash's
+   monthly commands and keep Neon from ever going idle.
+4. Optional: an UptimeRobot HTTP monitor on `https://<name>.onrender.com/`
+   every 5 minutes keeps the free service awake (750 free hours a month covers one service).
 
 Limits to know (as of Nov 2026; check the providers' pages):
 
@@ -322,5 +332,5 @@ No site is unhackable. These layers mean one mistake doesn't expose everything.
 Your code is yours. **Stockfish is GPLv3**: the web app serves Stockfish's
 licence next to the engine (`/stockfish/COPYING.txt`) and links its source in
 the footer. Keep both if you deploy publicly.
-The name "Rookery" and its logo are placeholders; rename freely. Don't use
+The name "YourShatranj" is this project's own; the rook logo is an original drawing. Don't use
 chess.com's name, logo, pieces or design as your own.

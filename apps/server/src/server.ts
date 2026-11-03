@@ -30,7 +30,7 @@ export async function buildServer(config: Config, log: Logger) {
   const users = new UserRepo(db);
   const tokens = new TokenService(db, config.JWT_ACCESS_SECRET, config.REFRESH_TOKEN_SECRET);
   const limiter = new RateLimiter(redis);
-  const chessCom = new ChessComClient(redis, `ChessPlatform/1.0 (contact: ${config.CHESSCOM_CONTACT})`);
+  const chessCom = new ChessComClient(redis, `YourShatranj/1.0 (contact: ${config.CHESSCOM_CONTACT})`);
 
   const httpServer = http.createServer();
   const io = createIo(httpServer, config, redis);

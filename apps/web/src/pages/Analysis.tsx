@@ -4,7 +4,8 @@ import { Chess, type Square } from 'chess.js';
 import { Board } from '../components/Board';
 import { EvalBar, evalLabel } from '../components/EvalBar';
 import { EvalGraph } from '../components/EvalGraph';
-import { ChevronIcon, FlipIcon, RookIcon } from '../components/Icons';
+import { ChevronIcon, FlipIcon } from '../components/Icons';
+import { KingLogo } from '../components/Logo';
 import { MOVE_CLASSES, MOVE_STYLE, MoveBadge } from '../components/MoveBadge';
 import { MoveList } from '../components/MoveList';
 import { PlayerBar } from '../components/PlayerBar';
@@ -22,7 +23,7 @@ interface LineMove {
   uci: string;
   san: string;
   fen: string;
-  /** The PGN comment after this move, e.g. "[%clk 0:04:58.3]" (chess.com and Rookery games have one). */
+  /** The PGN comment after this move, e.g. "[%clk 0:04:58.3]" (chess.com and YourShatranj games have one). */
   comment?: string;
 }
 
@@ -481,7 +482,7 @@ export function Analysis() {
 
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-go text-white">
-              <RookIcon className="h-7 w-7" />
+              <KingLogo className="h-9 w-9" />
             </span>
             <p className="relative min-h-11 flex-1 rounded-xl bg-ink px-3.5 py-2.5 text-[15px] leading-snug text-felt" aria-live="polite">
               {coach}

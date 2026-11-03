@@ -64,7 +64,7 @@ const WEB_ROOT = path.resolve(here, '..');
 const PARAMS_FILE = path.join(WEB_ROOT, 'src/engine/accuracy-params.json');
 const CACHE_FILE = path.join(WEB_ROOT, '.calibration-cache.json');
 // chess.com asks API clients to identify themselves; no personal data needed.
-const USER_AGENT = 'RookeryAccuracyCalibration/1.0 (open-source chess project)';
+const USER_AGENT = 'YourShatranjAccuracyCalibration/1.0 (open-source chess project)';
 
 // ------------------------------------------------------------------ args
 

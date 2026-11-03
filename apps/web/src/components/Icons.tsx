@@ -1,4 +1,4 @@
-/** Small line icons drawn for Rookery (24×24, currentColor). */
+/** Small line icons drawn for YourShatranj (24×24, currentColor). */
 
 type IconProps = { className?: string };
 
@@ -13,14 +13,6 @@ const base = {
   strokeLinejoin: 'round' as const,
   'aria-hidden': true,
 };
-
-export function RookIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M6 20h12M7 17h10l-1-7H8l-1 7ZM6.5 10h11V5h-2.4v2h-2.2V5h-1.8v2H8.9V5H6.5v5Z" />
-    </svg>
-  );
-}
 
 export function PlayIcon({ className }: IconProps) {
   // A knight's head
