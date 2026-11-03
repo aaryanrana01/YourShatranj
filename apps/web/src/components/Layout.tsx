@@ -128,7 +128,10 @@ export function Layout() {
           <a className="underline hover:text-muted" href="https://github.com/official-stockfish/Stockfish" rel="noreferrer" target="_blank">
             source
           </a>
-          ), running in your browser.
+          ), running in your browser. ·{' '}
+          <Link className="underline hover:text-muted" to="/privacy">
+            Privacy
+          </Link>
         </footer>
       </div>
     </div>

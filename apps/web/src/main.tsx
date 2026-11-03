@@ -5,6 +5,7 @@ import { Layout } from './components/Layout';
 import { useAuth } from './lib/auth';
 import { AuthPage } from './pages/Auth';
 import { Play } from './pages/Play';
+import { Privacy } from './pages/Privacy';
 import { Welcome } from './pages/Welcome';
 import './styles.css';
 
@@ -37,6 +38,7 @@ function App() {
           <Route path="login" element={<AuthPage mode="login" />} />
           <Route path="register" element={<AuthPage mode="register" />} />
           <Route path="welcome" element={<Welcome />} />
+          <Route path="privacy" element={<Privacy />} />
           <Route path="game/:id" element={<RequireAuth><Game /></RequireAuth>} />
           <Route path="analysis" element={<Analysis />} />
           <Route path="import" element={<Import />} />
