@@ -1,0 +1,24 @@
+{
+  "name": "chess-platform",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Real-time multiplayer chess with free, unlimited Stockfish analysis and chess.com game import",
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "argon2",
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @chess/server --filter @chess/web dev",
+    "build": "pnpm --filter @chess/shared build && pnpm --filter @chess/web build && pnpm --filter @chess/server build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @chess/server db:migrate",
+    "start": "pnpm --filter @chess/server start"
+  }
+}

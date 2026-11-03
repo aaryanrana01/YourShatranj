@@ -1,0 +1,6 @@
+# Caddy gets and renews a free HTTPS certificate (Let's Encrypt) for your
+# domain automatically, and proxies WebSockets without extra config.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:4000
+}

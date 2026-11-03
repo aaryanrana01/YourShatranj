@@ -1,0 +1,20 @@
+# Just the databases, for local development: `docker compose -f docker-compose.dev.yml up -d`
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: chess
+      POSTGRES_PASSWORD: chess
+      POSTGRES_DB: chess
+    ports:
+      - '5432:5432'
+    volumes:
+      - devpg:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+
+volumes:
+  devpg:

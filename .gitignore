@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+apps/web/public/stockfish/
+apps/web/.calibration-cache.json
+*.zip
+.DS_Store

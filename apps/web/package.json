@@ -1,0 +1,37 @@
+{
+  "name": "@chess/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/copy-stockfish.mjs && vite",
+    "build": "node scripts/copy-stockfish.mjs && tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json --noEmit",
+    "test": "vitest run",
+    "calibrate": "tsx scripts/calibrate-accuracy.ts"
+  },
+  "dependencies": {
+    "@chess/shared": "workspace:*",
+    "chess.js": "^1.4.0",
+    "react": "^19.1.1",
+    "react-chessboard": "4.7.3",
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^7.9.1",
+    "socket.io-client": "^4.8.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.3",
+    "stockfish": "^17.1.0",
+    "tailwindcss": "^4.1.13",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.5",
+    "vitest": "^3.2.4"
+  }
+}

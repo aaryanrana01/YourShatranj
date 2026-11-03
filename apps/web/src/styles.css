@@ -1,0 +1,64 @@
+@import 'tailwindcss';
+
+/* Rookery's own palette: deep ink background, warm amber accent. */
+@theme {
+  --color-ink-950: #0f131b;
+  --color-ink-900: #151b26;
+  --color-ink-800: #1b2230;
+  --color-ink-700: #252e3f;
+  --color-ink-600: #344056;
+  --color-ink-400: #7d8aa3;
+  --color-ink-200: #c9d1e0;
+  --color-amber-accent: #f2b84b;
+  --color-good: #5fbf8a;
+  --color-inacc: #e6c35c;
+  --color-mistake: #e8914a;
+  --color-blunder: #e0565b;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-ink-200);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: filter 120ms, background-color 120ms;
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+@utility btn-primary {
+  @apply btn bg-amber-accent text-ink-950 hover:brightness-110;
+}
+
+@utility btn-ghost {
+  @apply btn bg-ink-700 text-ink-200 hover:bg-ink-600;
+}
+
+@utility card {
+  @apply rounded-xl border border-ink-700 bg-ink-900;
+}
+
+@utility input {
+  @apply w-full rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-sm text-ink-200 outline-none placeholder:text-ink-400 focus:border-amber-accent;
+}
