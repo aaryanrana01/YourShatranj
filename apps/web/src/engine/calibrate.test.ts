@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { type Sample, chooseModel, crossValidate, fit, foldOf, isHoldout, mae, pickGames } from './calibrate';
+import {
+  type Sample,
+  breakdown,
+  chooseModel,
+  crossValidate,
+  crossValidateByPlayer,
+  fit,
+  foldOf,
+  isHoldout,
+  mae,
+  outOfFold,
+  pickGames,
+  ratingBand,
+  standsOut,
+} from './calibrate';
 import { LICHESS_PARAMS, gameAccuracy } from './review';
 
 /** Deterministic random numbers, so the test is the same every run. */
@@ -106,4 +120,70 @@ describe('accuracy calibration', () => {
     expect(pickGames(data).map((g) => g.id)).toEqual(['a']);
     expect(pickGames(null)).toEqual([]);
   });
+
+  it('filters by time control and keeps ratings', () => {
+    const pgn = `1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7 11. c4 c6 1-0`;
+    const game = (url: string, time_class: string) => ({
+      url,
+      pgn,
+      rules: 'chess',
+      time_class,
+      accuracies: { white: 80, black: 70 },
+      white: { rating: 1250 },
+      black: { rating: 1310 },
+    });
+    const data = { games: [game('a', 'blitz'), game('b', 'rapid'), game('c', 'bullet')] };
+    expect(pickGames(data).map((g) => g.id)).toEqual(['a', 'b', 'c']);
+    const rapid = pickGames(data, 20, ['rapid']);
+    expect(rapid.map((g) => g.id)).toEqual(['b']);
+    expect(rapid[0]).toMatchObject({ timeClass: 'rapid', ratings: { white: 1250, black: 1310 } });
+    expect(pickGames(data, 20, ['blitz', 'bullet']).map((g) => g.id)).toEqual(['a', 'c']);
+  });
+
+  it('groups ratings into bands', () => {
+    expect(ratingBand(850)).toBe('under 1000');
+    expect(ratingBand(1250)).toBe('1000–1499');
+    expect(ratingBand(1999)).toBe('1500–1999');
+    expect(ratingBand(2400)).toBe('2000+');
+    expect(ratingBand(undefined)).toBeUndefined();
+  });
+
+  it('leave-one-player-out never tests a player on a fit that saw them', () => {
+    const rand = rng(5);
+    const samples: (Sample & { id: string })[] = [];
+    for (const player of ['ann', 'bob', 'cat']) {
+      for (let g = 0; g < 8; g++) {
+        const evals = fakeGame(rand, 40);
+        const acc = gameAccuracy(evals, { ...LICHESS_PARAMS, scale: 1.3 });
+        samples.push({ id: `${player}${g}`, evals, side: 'w', target: acc.w, player });
+      }
+    }
+    const preds = outOfFold(samples, 'stretch', (s) => s.player!);
+    expect(preds).toHaveLength(samples.length);
+    // Everyone follows the same rule here, so unseen players are predicted well.
+    expect(crossValidateByPlayer(samples, 'stretch')).toBeLessThan(0.5);
+  }, 60_000);
+
+  it('flags a group that one setting does not fit', () => {
+    const rand = rng(11);
+    const samples: (Sample & { id: string })[] = [];
+    for (let g = 0; g < 30; g++) {
+      const evals = fakeGame(rand, 40);
+      // chess.com is much harsher on bullet in this made-up data.
+      const timeClass = g % 2 === 0 ? 'bullet' : 'rapid';
+      const truth = { ...LICHESS_PARAMS, scale: timeClass === 'bullet' ? 1.8 : 1.0 };
+      const acc = gameAccuracy(evals, truth);
+      samples.push({ id: `g${g}`, evals, side: 'w', target: acc.w, timeClass, player: 'p' });
+      samples.push({ id: `g${g}`, evals, side: 'b', target: acc.b, timeClass, player: 'p' });
+    }
+    const preds = outOfFold(samples, 'stretch', (s) => String(foldOf(s.id, 5)));
+    const rows = breakdown(preds, (s) => s.timeClass);
+    const bullet = rows.find((r) => r.group === 'bullet')!;
+    const rapid = rows.find((r) => r.group === 'rapid')!;
+    // One shared setting lands in between: too generous on bullet, too harsh on rapid.
+    expect(bullet.bias).toBeGreaterThan(2);
+    expect(rapid.bias).toBeLessThan(-2);
+    expect(standsOut(bullet)).toBe(true);
+    expect(standsOut(rapid)).toBe(true);
+  }, 60_000);
 });

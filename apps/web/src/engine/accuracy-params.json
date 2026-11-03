@@ -1,13 +1,23 @@
 {
   "winSlope": 0.00368208,
-  "decay": 0.1715,
-  "scale": 0.4972,
+  "decay": 0.04354415386753951,
+  "scale": 1.267,
   "source": "fitted to chess.com accuracies",
-  "model": "stretch+decay",
+  "model": "stretch",
+  "validation": "leave-one-player-out",
+  "players": [
+    "bros_slams",
+    "chahitsharma2004",
+    "hikaru",
+    "kingharsh6512"
+  ],
+  "timeClasses": [
+    "rapid"
+  ],
   "depth": 18,
-  "games": 40,
-  "maeBefore": 9.25,
-  "maeAfter": 4.94,
-  "maeUnseen": 5.22,
+  "games": 154,
+  "maeBefore": 7.87,
+  "maeAfter": 6.63,
+  "maeUnseen": 6.67,
   "fittedAt": "2026-11-03"
 }

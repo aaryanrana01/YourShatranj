@@ -18,6 +18,10 @@ export interface Sample {
   side: 'w' | 'b';
   /** chess.com's accuracy for that side. */
   target: number;
+  /** Optional details, used to test on unseen players and to break errors down by group. */
+  player?: string;
+  timeClass?: string;
+  rating?: number;
 }
 
 export function mae(samples: Sample[], p: AccuracyParams): number {
@@ -136,17 +140,92 @@ export function fit(
  * a single held-out batch. Both sides of a game always stay in the same group.
  */
 export function crossValidate(samples: (Sample & { id: string })[], model: ModelName, k = 5): number {
-  let total = 0;
-  let count = 0;
-  for (let f = 0; f < k; f++) {
-    const test = samples.filter((s) => foldOf(s.id, k) === f);
-    const train = samples.filter((s) => foldOf(s.id, k) !== f);
+  return meanAbs(outOfFold(samples, model, (s) => String(foldOf(s.id, k))));
+}
+
+/**
+ * Leave-one-player-out: each player's games are held out in turn while the
+ * model is fitted on everyone else's. This answers the question the site
+ * actually faces: how close are we for someone whose games we never tuned on?
+ */
+export function crossValidateByPlayer(samples: (Sample & { id: string })[], model: ModelName): number {
+  return meanAbs(outOfFold(samples, model, (s) => s.player ?? 'unknown'));
+}
+
+export interface Prediction {
+  sample: Sample & { id: string };
+  /** Our accuracy for this side, from a model that never saw this sample's group. */
+  predicted: number;
+}
+
+/**
+ * Fits the model once per group (leaving that group out) and predicts the
+ * left-out samples. Every sample gets exactly one "unseen" prediction, which is
+ * what both the overall error and the per-group breakdown are built from.
+ */
+export function outOfFold(
+  samples: (Sample & { id: string })[],
+  model: ModelName,
+  groupOf: (s: Sample & { id: string }) => string,
+): Prediction[] {
+  const groups = [...new Set(samples.map(groupOf))];
+  const out: Prediction[] = [];
+  for (const g of groups) {
+    const test = samples.filter((s) => groupOf(s) === g);
+    const train = samples.filter((s) => groupOf(s) !== g);
     if (test.length === 0 || train.length === 0) continue;
     const { params } = fit(train, model);
-    total += mae(test, params) * test.length;
-    count += test.length;
+    for (const s of test) out.push({ sample: s, predicted: gameAccuracy(s.evals, params)[s.side] });
   }
-  return count === 0 ? NaN : total / count;
+  return out;
+}
+
+function meanAbs(preds: Prediction[]): number {
+  if (preds.length === 0) return NaN;
+  return preds.reduce((t, p) => t + Math.abs(p.predicted - p.sample.target), 0) / preds.length;
+}
+
+export interface GroupError {
+  group: string;
+  count: number;
+  /** Average distance from chess.com, in accuracy points. */
+  mae: number;
+  /** Positive = our numbers run higher than chess.com's for this group. */
+  bias: number;
+}
+
+/** Splits unseen-game errors by a label (time control, rating band, player). */
+export function breakdown(preds: Prediction[], labelOf: (s: Sample) => string | undefined): GroupError[] {
+  const byGroup = new Map<string, Prediction[]>();
+  for (const p of preds) {
+    const label = labelOf(p.sample) ?? 'unknown';
+    byGroup.set(label, [...(byGroup.get(label) ?? []), p]);
+  }
+  return [...byGroup.entries()]
+    .map(([group, list]) => ({
+      group,
+      count: list.length,
+      mae: meanAbs(list),
+      bias: list.reduce((t, p) => t + (p.predicted - p.sample.target), 0) / list.length,
+    }))
+    .sort((a, b) => a.group.localeCompare(b.group));
+}
+
+export function ratingBand(rating: number | undefined): string | undefined {
+  if (rating === undefined || !Number.isFinite(rating) || rating <= 0) return undefined;
+  if (rating < 1000) return 'under 1000';
+  if (rating < 1500) return '1000–1499';
+  if (rating < 2000) return '1500–1999';
+  return '2000+';
+}
+
+/**
+ * A group stands out when, on unseen games, we're consistently on one side of
+ * chess.com by 2+ points and there are enough samples to trust it. That's the
+ * sign a single setting doesn't fit everyone.
+ */
+export function standsOut(g: GroupError, minCount = 10, minBias = 2): boolean {
+  return g.count >= minCount && Math.abs(g.bias) >= minBias;
 }
 
 /**
@@ -187,14 +266,26 @@ export interface CalibrationGame {
   id: string;
   pgn: string;
   accuracies: { white: number; black: number };
+  /** bullet, blitz, rapid or daily (chess.com's label). */
+  timeClass?: string;
+  ratings?: { white: number; black: number };
+  /** Which of the requested accounts this game was downloaded for. */
+  player?: string;
 }
+
+export const TIME_CLASS_NAMES = ['bullet', 'blitz', 'rapid', 'daily'] as const;
 
 /**
  * Picks usable games from one month of chess.com's archive: standard chess
  * only (variants like Chess960 can't be replayed), reviewed (has accuracies),
- * and long enough that one move doesn't decide the whole score.
+ * long enough that one move doesn't decide the whole score, and, if asked,
+ * only some time controls.
  */
-export function pickGames(monthJson: unknown, minPlies = 20): CalibrationGame[] {
+export function pickGames(
+  monthJson: unknown,
+  minPlies = 20,
+  timeClasses: readonly string[] = [],
+): CalibrationGame[] {
   const games = (monthJson as { games?: unknown[] } | null)?.games;
   if (!Array.isArray(games)) return [];
   const out: CalibrationGame[] = [];
@@ -203,10 +294,15 @@ export function pickGames(monthJson: unknown, minPlies = 20): CalibrationGame[] 
       url?: unknown;
       pgn?: unknown;
       rules?: unknown;
+      time_class?: unknown;
       accuracies?: { white?: unknown; black?: unknown };
+      white?: { rating?: unknown };
+      black?: { rating?: unknown };
     };
     if (typeof g.url !== 'string' || typeof g.pgn !== 'string') continue;
     if ((g.rules ?? 'chess') !== 'chess') continue;
+    const timeClass = typeof g.time_class === 'string' ? g.time_class : undefined;
+    if (timeClasses.length > 0 && (!timeClass || !timeClasses.includes(timeClass))) continue;
     const w = g.accuracies?.white;
     const b = g.accuracies?.black;
     if (typeof w !== 'number' || typeof b !== 'number') continue;
@@ -214,7 +310,15 @@ export function pickGames(monthJson: unknown, minPlies = 20): CalibrationGame[] 
     const moveText = g.pgn.replace(/\[[^\]]*\]/g, '').replace(/\{[^}]*\}/g, '');
     const plies = moveText.split(/\s+/).filter((t) => t && !/^\d+\.+$/.test(t) && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t)).length;
     if (plies < minPlies) continue;
-    out.push({ id: g.url, pgn: g.pgn, accuracies: { white: w, black: b } });
+    const wr = g.white?.rating;
+    const br = g.black?.rating;
+    out.push({
+      id: g.url,
+      pgn: g.pgn,
+      accuracies: { white: w, black: b },
+      timeClass,
+      ratings: typeof wr === 'number' && typeof br === 'number' ? { white: wr, black: br } : undefined,
+    });
   }
   return out;
 }

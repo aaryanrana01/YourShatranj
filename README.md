@@ -138,6 +138,16 @@ so the gap can be measured and fitted away:
 pnpm --filter @chess/web calibrate <your chess.com username> --games 40
 ```
 
+To fit a mix of players (recommended for a public site), list several
+usernames; `--games` is then per player:
+
+```bash
+pnpm --filter @chess/web calibrate player1 player2 player3 player4 --games 30
+pnpm --filter @chess/web calibrate player1 player2 --time-class rapid   # only rapid games
+```
+
+Add `--dry-run` to see the report without changing the saved settings.
+
 What it does, and why:
 
 1. **Downloads your games that were reviewed on chess.com.** Only reviewed
@@ -153,7 +163,12 @@ What it does, and why:
    the values closest to chess.com's numbers. About a quarter of the games are
    held out of the fit and used to report the error on games it never saw:
    an honest estimate for new games.
-4. **Saves them to `apps/web/src/engine/accuracy-params.json`.** Commit that
+4. **Checks where the remaining error comes from**: the unseen-games error
+   split by time control, rating band and player. A group that is off by 2+
+   points in one direction is flagged: that's the sign one setting doesn't
+   fit everyone. With several players, testing leaves out a whole player at a
+   time, because the site mostly sees people it was never tuned on.
+5. **Saves them to `apps/web/src/engine/accuracy-params.json`.** Commit that
    file; restart `pnpm dev` and the review uses the new constants. Expect to
    land within a few points of chess.com, not exactly on it: their engine,
    depth and formula still differ from ours.

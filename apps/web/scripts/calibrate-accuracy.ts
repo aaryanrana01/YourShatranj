@@ -1,24 +1,32 @@
 /**
  * Fits our accuracy formula to chess.com's accuracies on real games.
  *
- *   pnpm --filter @chess/web calibrate <chess.com username> [--games 40] [--depth 18]
+ *   pnpm --filter @chess/web calibrate <username> [more usernames…] [--games 40] [--depth 18]
  *
- * 1. Downloads the player's games that were reviewed on chess.com (only those
- *    carry chess.com's accuracy numbers).
+ * 1. Downloads each player's games that were reviewed on chess.com (only those
+ *    carry chess.com's accuracy numbers). With several players, games come from
+ *    all of them, so the result fits a mix of levels rather than one person.
  * 2. Evaluates every position with the SAME Stockfish build the browser uses,
  *    at the same depth as the review, so the fitted numbers apply directly.
  *    Results are cached in .calibration-cache.json, so a rerun (or a run
  *    stopped half-way) doesn't repeat engine work.
- * 3. Tries three versions of the formula with more or less freedom, scores
- *    each on games it wasn't tuned on (5-fold cross-validation), keeps the
- *    simplest one that isn't clearly worse, and writes its constants to
- *    src/engine/accuracy-params.json, which the web app reads.
+ * 3. Tries three versions of the formula with more or less freedom and scores
+ *    each on data it wasn't tuned on: with one player, 5-fold cross-validation
+ *    over games; with several, leave-one-player-out (fit on everyone else,
+ *    test on the player left out), which is what the site really faces.
+ *    Keeps the simplest version that isn't clearly worse.
+ * 4. Breaks the unseen-games error down by time control, rating band and
+ *    player, and flags any group that one setting doesn't fit.
+ * 5. Writes the constants to src/engine/accuracy-params.json, which the web app reads.
  *
  * Options:
- *   --games N        how many reviewed games to use (default 40; more = better fit, slower)
+ *   --games N        reviewed games to use PER PLAYER (default 40; more = better fit, slower)
+ *   --time-class T   only these time controls, comma-separated: bullet,blitz,rapid,daily
  *   --depth D        engine depth; must match the review depth you'll use (default 18 = "Standard")
  *   --from-file F    use games from a JSON file instead of chess.com:
- *                    [{ "id": "...", "pgn": "...", "accuracies": { "white": 81.2, "black": 74.0 } }]
+ *                    [{ "id": "...", "pgn": "...", "accuracies": { "white": 81.2, "black": 74.0 },
+ *                       "timeClass": "blitz", "ratings": { "white": 1250, "black": 1300 }, "player": "name" }]
+ *                    (the last three fields are optional)
  *   --dry-run        fit and report, but don't overwrite accuracy-params.json
  */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -29,15 +37,23 @@ import { fileURLToPath } from 'node:url';
 import { Chess } from 'chess.js';
 import {
   type CalibrationGame,
+  type GroupError,
   MODELS,
   type ModelName,
   type Sample,
+  TIME_CLASS_NAMES,
   bias,
+  breakdown,
   chooseModel,
   crossValidate,
+  crossValidateByPlayer,
   fit,
+  foldOf,
   mae,
+  outOfFold,
   pickGames,
+  ratingBand,
+  standsOut,
 } from '../src/engine/calibrate';
 import { LICHESS_PARAMS } from '../src/engine/review';
 import { terminalEvalCp } from '../src/engine/terminal';
@@ -53,23 +69,39 @@ const USER_AGENT = 'RookeryAccuracyCalibration/1.0 (open-source chess project)';
 // ------------------------------------------------------------------ args
 
 function parseArgs(argv: string[]) {
-  const opts = { username: '', games: 40, depth: 18, fromFile: '', dryRun: false };
+  const opts = {
+    usernames: [] as string[],
+    games: 40,
+    depth: 18,
+    fromFile: '',
+    dryRun: false,
+    timeClasses: [] as string[],
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === '--games') opts.games = Number(argv[++i]);
     else if (a === '--depth') opts.depth = Number(argv[++i]);
     else if (a === '--from-file') opts.fromFile = argv[++i] ?? '';
     else if (a === '--dry-run') opts.dryRun = true;
-    else if (!a.startsWith('--')) opts.username = a;
+    else if (a === '--time-class') {
+      opts.timeClasses = (argv[++i] ?? '')
+        .split(',')
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+    } else if (!a.startsWith('--')) opts.usernames.push(a);
   }
-  if (!opts.username && !opts.fromFile) {
-    console.error('Usage: pnpm --filter @chess/web calibrate <chess.com username> [--games 40] [--depth 18]');
+  if (opts.usernames.length === 0 && !opts.fromFile) {
+    console.error('Usage: pnpm --filter @chess/web calibrate <username> [more usernames…] [--games 40] [--depth 18]');
     process.exit(1);
   }
-  if (!/^[A-Za-z0-9_-]{2,25}$/.test(opts.username) && !opts.fromFile) {
-    console.error('That does not look like a chess.com username.');
-    process.exit(1);
+  for (const u of opts.usernames) {
+    if (!/^[A-Za-z0-9_-]{2,25}$/.test(u)) {
+      console.error(`"${u}" does not look like a chess.com username.`);
+      process.exit(1);
+    }
   }
+  const bad = opts.timeClasses.filter((t) => !(TIME_CLASS_NAMES as readonly string[]).includes(t));
+  if (bad.length > 0) throw new Error(`Unknown --time-class ${bad.join(', ')}; use ${TIME_CLASS_NAMES.join(', ')}`);
   if (!Number.isInteger(opts.games) || opts.games < 5) throw new Error('--games must be at least 5');
   if (!Number.isInteger(opts.depth) || opts.depth < 6 || opts.depth > 24) throw new Error('--depth must be 6–24');
   return opts;
@@ -92,21 +124,27 @@ async function getJson(url: string): Promise<unknown> {
   throw new Error('chess.com kept rate-limiting; try again in a minute.');
 }
 
-async function downloadGames(username: string, wanted: number): Promise<CalibrationGame[]> {
+async function downloadGames(
+  username: string,
+  wanted: number,
+  timeClasses: string[],
+  alreadyPicked: Set<string>,
+): Promise<CalibrationGame[]> {
   const user = username.toLowerCase();
   const { archives } = (await getJson(`https://api.chess.com/pub/player/${user}/games/archives`)) as { archives: string[] };
   const picked: CalibrationGame[] = [];
   for (const monthUrl of [...archives].reverse()) {
     if (picked.length >= wanted) break;
     process.stdout.write(`  ${monthUrl.slice(-7)}: `);
-    const found = pickGames(await getJson(monthUrl));
-    console.log(`${found.length} reviewed games`);
-    picked.push(...found);
+    // A game between two of the requested players is used once, for whoever came first.
+    const found = pickGames(await getJson(monthUrl), 20, timeClasses).filter((g) => !alreadyPicked.has(g.id));
+    console.log(`${found.length} reviewed games${timeClasses.length ? ` (${timeClasses.join('/')})` : ''}`);
+    for (const g of found) picked.push({ ...g, player: user });
   }
   if (picked.length === 0) {
-    throw new Error(
-      'No reviewed games found. chess.com only publishes accuracy for games that have been reviewed: ' +
-        'open a few of your games on chess.com, run Game Review, then try again.',
+    console.log(
+      `  No reviewed games found for ${username}. chess.com only publishes accuracy for games that have been ` +
+        'reviewed (Game Review); this player is skipped.',
     );
   }
   return picked.slice(0, wanted);
@@ -238,42 +276,98 @@ async function evaluateGames(games: CalibrationGame[], depth: number): Promise<M
 // ------------------------------------------------------------------ main
 
 const fmt = (n: number) => n.toFixed(2);
+const signed = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}`;
+// Same split the single-player cross-validation uses.
+const foldIndex = (id: string) => foldOf(id, 5);
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
 
-  console.log(opts.fromFile ? `Reading games from ${opts.fromFile}` : `Fetching reviewed games for ${opts.username}…`);
-  const games: CalibrationGame[] = opts.fromFile
-    ? (JSON.parse(readFileSync(opts.fromFile, 'utf8')) as CalibrationGame[]).slice(0, opts.games)
-    : await downloadGames(opts.username, opts.games);
-  if (games.length < opts.games) console.log(`Only ${games.length} reviewed games available; using all of them.`);
+  const games: CalibrationGame[] = [];
+  if (opts.fromFile) {
+    console.log(`Reading games from ${opts.fromFile}`);
+    const all = JSON.parse(readFileSync(opts.fromFile, 'utf8')) as CalibrationGame[];
+    const filtered = opts.timeClasses.length ? all.filter((g) => g.timeClass && opts.timeClasses.includes(g.timeClass)) : all;
+    // Keep up to --games per player (games without a player count as one group).
+    const perPlayer = new Map<string, number>();
+    for (const g of filtered) {
+      const key = g.player ?? 'file';
+      if ((perPlayer.get(key) ?? 0) >= opts.games) continue;
+      perPlayer.set(key, (perPlayer.get(key) ?? 0) + 1);
+      games.push(g);
+    }
+  } else {
+    const seen = new Set<string>();
+    for (const username of opts.usernames) {
+      console.log(`Fetching reviewed games for ${username}…`);
+      const got = await downloadGames(username, opts.games, opts.timeClasses, seen);
+      for (const g of got) seen.add(g.id);
+      if (got.length > 0 && got.length < opts.games) console.log(`  Only ${got.length} usable games for ${username}.`);
+      games.push(...got);
+    }
+  }
+  if (games.length === 0) throw new Error('No usable games found.');
 
   const evals = await evaluateGames(games, opts.depth);
   const samples: (Sample & { id: string })[] = [];
   for (const g of games) {
     const e = evals.get(g.id);
     if (!e) continue;
-    samples.push({ id: g.id, evals: e, side: 'w', target: g.accuracies.white });
-    samples.push({ id: g.id, evals: e, side: 'b', target: g.accuracies.black });
+    const common = { id: g.id, evals: e, player: g.player, timeClass: g.timeClass };
+    samples.push({ ...common, side: 'w', target: g.accuracies.white, rating: g.ratings?.white });
+    samples.push({ ...common, side: 'b', target: g.accuracies.black, rating: g.ratings?.black });
   }
   if (samples.length < 10) throw new Error('Too few usable games to fit (need at least 5).');
 
-  console.log(`\n${samples.length / 2} games.`);
+  const players = [...new Set(samples.map((s) => s.player ?? 'unknown'))];
+  const byPlayer = players.length >= 2;
+  console.log(`\n${samples.length / 2} games from ${players.length} player${players.length === 1 ? '' : 's'}.`);
   const before = { all: mae(samples, LICHESS_PARAMS), bias: bias(samples, LICHESS_PARAMS) };
   console.log(`Lichess formula: off by ${fmt(before.all)} points on average (ours ${before.bias >= 0 ? 'higher' : 'lower'} by ${fmt(Math.abs(before.bias))}).`);
 
   // Compare how much freedom the formula gets, scoring each option only on
-  // games it was NOT tuned on (5-fold cross-validation), then keep the simplest
-  // option that isn't clearly worse.
-  console.log('\nError on unseen games (5-fold cross-validation):');
+  // data it was NOT tuned on, then keep the simplest option that isn't clearly
+  // worse. With several players, a whole player is left out at a time.
+  const validation = byPlayer ? 'leave-one-player-out' : '5-fold cross-validation';
+  console.log(`\nError on unseen ${byPlayer ? 'players' : 'games'} (${validation}):`);
   const cv = {} as Record<ModelName, number>;
   for (const model of MODELS) {
-    cv[model] = crossValidate(samples, model, 5);
+    cv[model] = byPlayer ? crossValidateByPlayer(samples, model) : crossValidate(samples, model, 5);
     console.log(`  ${model.padEnd(14)} ${fmt(cv[model])} points`);
   }
   const chosen = chooseModel(cv);
   const unseen: number | null = Number.isFinite(cv[chosen]) ? cv[chosen] : null;
   console.log(`Using "${chosen}": simplest option within 0.3 points of the best.`);
+
+  // Where does the remaining error come from? Same unseen predictions, split up.
+  const preds = outOfFold(samples, chosen, byPlayer ? (s) => s.player ?? 'unknown' : (s) => String(foldIndex(s.id)));
+  const flagged: string[] = [];
+  const table = (title: string, rows: GroupError[]) => {
+    if (rows.length < 2 && rows[0]?.group === 'unknown') return;
+    console.log(`\n${title}`);
+    console.log(`  ${'group'.padEnd(14)} ${'sides'.padStart(6)} ${'error'.padStart(7)} ${'bias'.padStart(7)}`);
+    for (const r of rows) {
+      const flag = standsOut(r) ? '  <- stands out' : '';
+      if (flag) flagged.push(`${title.toLowerCase()} "${r.group}"`);
+      console.log(`  ${r.group.padEnd(14)} ${String(r.count).padStart(6)} ${fmt(r.mae).padStart(7)} ${signed(r.bias).padStart(7)}${flag}`);
+    }
+  };
+  table('By time control', breakdown(preds, (s) => s.timeClass));
+  const bandOrder = ['under 1000', '1000–1499', '1500–1999', '2000+', 'unknown'];
+  table(
+    'By rating',
+    breakdown(preds, (s) => ratingBand(s.rating)).sort((a, b) => bandOrder.indexOf(a.group) - bandOrder.indexOf(b.group)),
+  );
+  if (byPlayer) table('By player', breakdown(preds, (s) => s.player));
+  if (flagged.length > 0) {
+    console.log(
+      `\nOne setting doesn't fit everyone: ${flagged.join(', ')} ${flagged.length === 1 ? 'is' : 'are'} off by 2+ points ` +
+        'in one direction. Separate settings for that group would likely help. Look at time control first: ' +
+        'if players play different mixes of bullet, blitz and rapid, a time-control difference also shows up per player.',
+    );
+  } else {
+    console.log('\nNo group stands out: one setting fits all of them.');
+  }
 
   const final = fit(samples, chosen);
   const after = { all: final.error, bias: bias(samples, final.params) };
@@ -301,6 +395,9 @@ async function main() {
     scale: Number(final.params.scale.toFixed(4)),
     source: 'fitted to chess.com accuracies',
     model: chosen,
+    validation,
+    players,
+    timeClasses: opts.timeClasses.length ? opts.timeClasses : 'all',
     depth: opts.depth,
     games: samples.length / 2,
     maeBefore: Number(before.all.toFixed(2)),
