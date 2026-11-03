@@ -50,6 +50,7 @@ export function Game() {
         name={p.username}
         rating={p.rating}
         color={c}
+        fen={state.fen}
         linkToProfile
         note={
           state.disconnectedAt[c] !== null && active ? (

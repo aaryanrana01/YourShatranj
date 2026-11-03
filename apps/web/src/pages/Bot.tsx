@@ -101,8 +101,8 @@ export function Bot() {
       : null;
 
   const botColor: 'w' | 'b' = color === 'w' ? 'b' : 'w';
-  const botBar = <PlayerBar name={`Stockfish · level ${level + 1}`} color={botColor} note={LEVELS[level]!.name.split(' · ')[1]} right={thinking ? <span className="text-sm text-muted">Thinking…</span> : null} />;
-  const youBar = <PlayerBar name={user?.username ?? 'You'} color={color} />;
+  const botBar = <PlayerBar name={`Stockfish · level ${level + 1}`} color={botColor} fen={fen} note={LEVELS[level]!.name.split(' · ')[1]} right={thinking ? <span className="text-sm text-muted">Thinking…</span> : null} />;
+  const youBar = <PlayerBar name={user?.username ?? 'You'} color={color} fen={fen} />;
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">

@@ -436,7 +436,7 @@ export function Analysis() {
       <section className="order-1 xl:order-2" aria-label="Board">
         <div className="mx-auto w-full max-w-[min(100%,calc(100vh-150px))]">
           <div className="pl-9">
-            <PlayerBar name={names[top]} rating={elos[top]} color={top} right={accuracyChip(top)} />
+            <PlayerBar name={names[top]} rating={elos[top]} color={top} fen={fen} right={accuracyChip(top)} />
           </div>
           <div className="flex gap-2">
             <EvalBar cp={barCp} label={barLabel} orientation={orientation} />
@@ -458,7 +458,7 @@ export function Analysis() {
             </div>
           </div>
           <div className="pl-9">
-            <PlayerBar name={names[bottom]} rating={elos[bottom]} color={bottom} right={accuracyChip(bottom)} />
+            <PlayerBar name={names[bottom]} rating={elos[bottom]} color={bottom} fen={fen} right={accuracyChip(bottom)} />
           </div>
         </div>
       </section>

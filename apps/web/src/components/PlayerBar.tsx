@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { CapturedPieces } from './CapturedPieces';
 
 /**
  * The strip above and below the board: avatar square, name, rating, and
  * whatever the page adds on the right (a clock, an accuracy score).
+ * Given the position, it also shows the pieces this player has captured and
+ * their material lead.
  */
 export function PlayerBar({
   name,
@@ -12,6 +15,7 @@ export function PlayerBar({
   linkToProfile = false,
   note,
   right,
+  fen,
 }: {
   name: string;
   rating?: number | string | null;
@@ -19,6 +23,8 @@ export function PlayerBar({
   linkToProfile?: boolean;
   note?: ReactNode;
   right?: ReactNode;
+  /** Current position; when given, captured pieces and "+N" appear under the name. */
+  fen?: string;
 }) {
   const initial = name.slice(0, 1).toUpperCase() || '?';
   const label = (
@@ -48,7 +54,12 @@ export function PlayerBar({
               <span className="tabular text-sm text-muted">({rating})</span>
             ) : null}
           </div>
-          {note ? <div className="text-xs text-muted">{note}</div> : null}
+          {note || fen ? (
+            <div className="flex min-h-4 flex-wrap items-center gap-x-2 text-xs text-muted">
+              {fen ? <CapturedPieces fen={fen} side={color} /> : null}
+              {note ? <span>{note}</span> : null}
+            </div>
+          ) : null}
         </div>
       </div>
       {right}
