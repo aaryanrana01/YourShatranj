@@ -101,6 +101,18 @@ export function Bot() {
       : null;
 
   const botColor: 'w' | 'b' = color === 'w' ? 'b' : 'w';
+  /** The game as a PGN with real player names, so the review shows them instead of "?". */
+  function reviewPgn() {
+    const copy = new Chess();
+    copy.loadPgn(game.pgn());
+    const you = user?.username ?? 'You';
+    const bot = `Stockfish level ${level + 1}`;
+    copy.setHeader('Event', 'Game against the bot');
+    copy.setHeader('White', color === 'w' ? you : bot);
+    copy.setHeader('Black', color === 'w' ? bot : you);
+    return copy.pgn();
+  }
+
   const botBar = <PlayerBar name={`Stockfish · level ${level + 1}`} color={botColor} fen={fen} note={LEVELS[level]!.name.split(' · ')[1]} right={thinking ? <span className="text-sm text-muted">Thinking…</span> : null} />;
   const youBar = <PlayerBar name={user?.username ?? 'You'} color={color} fen={fen} />;
 
@@ -173,7 +185,7 @@ export function Bot() {
             <button
               type="button"
               className="btn-quiet mt-3 w-full"
-              onClick={() => navigate('/analysis', { state: { pgn: game.pgn(), autoReview: true } })}
+              onClick={() => navigate('/analysis', { state: { pgn: reviewPgn(), autoReview: true } })}
             >
               Review this game
             </button>

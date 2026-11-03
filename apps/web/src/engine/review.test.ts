@@ -85,4 +85,22 @@ describe('review maths', () => {
     expect(review.accuracy.w).toBeGreaterThan(review.accuracy.b);
     expect(review.counts.b.blunder).toBe(1);
   });
+
+  it('calls any checkmate "best", even when the engine preferred a different mate', () => {
+    // White has two mates in one (like Qg7# and Qxf8#); the engine named the other one.
+    const review = reviewGame([{ uci: 'g6g7', san: 'Qg7#' }], [9_990, 10_000], ['g6f8']);
+    expect(review.moves[0]!.classification).toBe('best');
+  });
+
+  it('calls a move "best" when it keeps the fastest forced mate', () => {
+    // White has mate in 3 and plays a different move from the engine's that still leaves mate in 2.
+    const review = reviewGame([{ uci: 'h5h7', san: 'Qh7+' }], [9_970, 9_980], ['d1d8']);
+    expect(review.moves[0]!.classification).toBe('best');
+  });
+
+  it('does not call a slower mate "best"', () => {
+    // Mate in 2 was available; the move played only keeps mate in 5.
+    const review = reviewGame([{ uci: 'a1a2', san: 'Ra2' }], [9_980, 9_950], ['h5h7']);
+    expect(review.moves[0]!.classification).not.toBe('best');
+  });
 });

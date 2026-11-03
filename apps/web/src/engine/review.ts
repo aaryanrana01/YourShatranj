@@ -135,6 +135,9 @@ export function gameAccuracy(evalsCp: number[], p: AccuracyParams = DEFAULT_PARA
   return { w: score(sides.w), b: score(sides.b) };
 }
 
+/** scoreToCp turns "mate in N" into 10 000 - 10N; anything this high is a forced mate. */
+const MATE_CP_THRESHOLD = 9_000;
+
 export function classify(winDrop: number, playedBest: boolean): MoveClass {
   if (playedBest) return 'best';
   if (winDrop < 2) return 'excellent';
@@ -178,7 +181,15 @@ export function reviewGame(
     const winAfter = mover === 'w' ? winAfterWhite : 100 - winAfterWhite;
     const winDrop = Math.max(0, winBefore - winAfter);
     const best = bestMoves[i] ?? null;
-    const classification = classify(winDrop, best !== null && best === m.uci);
+    // Often several moves are equally best, e.g. two different mates in one. The
+    // engine names only one, so also count a move as best when it checkmates, or
+    // when it keeps a forced mate at least as fast as the engine's line. (Mate
+    // scores are exact; ordinary centipawn scores are too noisy for this test.)
+    const moverBefore = mover === 'w' ? before : -before;
+    const moverAfter = mover === 'w' ? after : -after;
+    const keepsFastestMate = moverBefore >= MATE_CP_THRESHOLD && moverAfter >= moverBefore;
+    const playedBest = (best !== null && best === m.uci) || m.san.endsWith('#') || keepsFastestMate;
+    const classification = classify(winDrop, playedBest);
     const accuracy = moveAccuracy(winBefore, winAfter, LICHESS_PARAMS.decay);
     counts[mover][classification]++;
     reviewed.push({ ply: i, uci: m.uci, san: m.san, bestMove: best, cpBefore: before, cpAfter: after, winDrop, accuracy, classification });

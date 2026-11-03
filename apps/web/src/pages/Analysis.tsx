@@ -278,7 +278,9 @@ export function Analysis() {
   const barCp = terminal ?? reviewEvals[cursor] ?? (liveHere ? scoreToCp(liveHere.score) : null);
   const barLabel = terminal === null && reviewEvals[cursor] === undefined && liveHere ? formatScore(liveHere.score) : undefined;
 
-  const names = { w: headers.White ?? 'White', b: headers.Black ?? 'Black' };
+  // "?" is the standard placeholder for an unknown player in PGN files.
+  const known = (name: string | undefined) => (name && name.trim() !== '' && name.trim() !== '?' ? name : null);
+  const names = { w: known(headers.White) ?? 'White', b: known(headers.Black) ?? 'Black' };
   const elos = { w: headers.WhiteElo, b: headers.BlackElo };
   const top: 'w' | 'b' = orientation === 'white' ? 'b' : 'w';
   const bottom: 'w' | 'b' = top === 'w' ? 'b' : 'w';
